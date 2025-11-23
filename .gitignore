@@ -1,0 +1,15 @@
+.DS_Store
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+*.log
+node_modules/
+
+# UV
+.python-version
+uv.lock

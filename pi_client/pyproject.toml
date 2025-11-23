@@ -1,0 +1,16 @@
+[project]
+name = "cams-connector-pi-client"
+version = "1.0.0"
+description = "Raspberry Pi WebSocket client for video streaming"
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=13.1",
+    "aiofiles>=24.1.0",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.7.0",
+    "python-dotenv>=1.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,19 @@
+[project]
+name = "cams-connector-proxy"
+version = "1.0.0"
+description = "Proxy server for Raspberry Pi video streaming"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.32.1",
+    "websockets>=13.1",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.7.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.19",
+    "python-dotenv>=1.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
