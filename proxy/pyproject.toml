@@ -13,7 +13,3 @@ dependencies = [
     "python-multipart>=0.0.19",
     "python-dotenv>=1.0.1",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
