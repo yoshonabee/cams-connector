@@ -227,6 +227,7 @@ async def stream_video(device_id: str, filename: str, request: Request):
         file_size = response.payload.get("size", 0)
         content_start = response.payload.get("start", 0)
         content_end = response.payload.get("end", file_size - 1)
+        content_length = response.payload.get("length", 0)
 
         # Prepare headers
         headers = {
@@ -241,17 +242,37 @@ async def stream_video(device_id: str, filename: str, request: Request):
 
         # Combine chunks for GET requests
         data = b"".join(chunks)
+        actual_data_length = len(data)
 
         # If range request, return 206 Partial Content
         if range_header:
+            # Ensure content_end doesn't exceed file_size - 1
+            if content_end >= file_size:
+                content_end = file_size - 1
+            # Ensure content_start is valid
+            if content_start < 0:
+                content_start = 0
+            # Use actual returned range from pi_client
+            # Content-Range format: bytes start-end/total
             headers["Content-Range"] = (
                 f"bytes {content_start}-{content_end}/{file_size}"
             )
+            # Content-Length should match the actual data size returned
+            # Expected length should be (content_end - content_start + 1)
+            expected_length = content_end - content_start + 1
+            headers["Content-Length"] = str(actual_data_length)
+            # Verify the length matches (log warning if mismatch)
+            if actual_data_length != expected_length:
+                logger.warning(
+                    f"Range response length mismatch for {filename}: "
+                    f"expected {expected_length} bytes (range {content_start}-{content_end}), "
+                    f"got {actual_data_length} bytes"
+                )
             status_code = 206
         else:
+            # Full file request
+            headers["Content-Length"] = str(actual_data_length)
             status_code = 200
-
-        headers["Content-Length"] = str(len(data))
 
         async def stream_data():
             """Stream the data in chunks."""
