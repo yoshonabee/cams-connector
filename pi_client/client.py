@@ -184,6 +184,9 @@ class PiClient:
         """Main receive loop."""
         try:
             async for message in self.ws:
+                if not self.running:
+                    logger.info("Stopping receive loop")
+                    break
                 if isinstance(message, str):
                     await self.handle_request(message)
                 else:
@@ -211,7 +214,11 @@ class PiClient:
 
             if self.running:
                 logger.info(f"Reconnecting in {settings.RECONNECT_DELAY} seconds...")
-                await asyncio.sleep(settings.RECONNECT_DELAY)
+                # Use sleep that can be interrupted by checking self.running
+                for _ in range(settings.RECONNECT_DELAY * 10):  # Check every 0.1 seconds
+                    if not self.running:
+                        break
+                    await asyncio.sleep(0.1)
 
     def stop(self):
         """Stop the client."""

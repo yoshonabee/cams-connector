@@ -22,13 +22,20 @@ async def main():
     # Create client
     client = PiClient()
 
-    # Handle signals for graceful shutdown
-    def signal_handler(signum, frame):
+    # Handle signals for graceful shutdown using asyncio
+    loop = asyncio.get_running_loop()
+
+    def signal_handler():
+        """Async signal handler for graceful shutdown."""
         logger.info("Received shutdown signal")
         client.stop()
+        # Close WebSocket connection to interrupt blocking operations
+        if client.ws:
+            asyncio.create_task(client.disconnect())
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # Register signal handlers
+    loop.add_signal_handler(signal.SIGINT, signal_handler)
+    loop.add_signal_handler(signal.SIGTERM, signal_handler)
 
     # Run client
     try:
