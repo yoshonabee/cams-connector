@@ -1,6 +1,7 @@
 """Configuration for Pi Client using pydantic-settings."""
 
 from pathlib import Path
+from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,9 @@ class Settings(BaseSettings):
     # Device identification
     DEVICE_ID: str = "cam1"
     DEVICE_TOKEN: str = "default-insecure-token"
+
+    # Cameras managed by this device
+    CAMERAS: List[str] = ["cam1"]
 
     # Proxy connection
     PROXY_URL: str = "ws://localhost:8000/ws/device/cam1"

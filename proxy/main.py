@@ -20,6 +20,7 @@ from models import (
     ListVideosPayload,
     ReadFilePayload,
     ErrorResponse,
+    ListCamerasResponse,
 )
 from ws_manager import ws_manager
 
@@ -94,16 +95,33 @@ async def device_websocket(websocket: WebSocket, device_id: str):
 
 
 # HTTP API for clients
+@router.get("/cameras", response_model=ListCamerasResponse)
+async def list_cameras():
+    """List all available cameras from all connected devices."""
+    cameras = ws_manager.get_all_cameras()
+    return ListCamerasResponse(cameras=cameras, total=len(cameras))
+
+
 @router.get("/devices/{device_id}/videos")
 async def list_videos(device_id: str):
-    """List available videos for a device/camera."""
+    """List available videos for a device/camera.
 
-    # Get device connection
-    device = ws_manager.get_device(device_id)
+    Note: device_id can be either a device ID or a camera ID.
+    The function will try to find the device by camera ID first.
+    """
+
+    # Try to find device by camera ID first
+    device = ws_manager.get_device_by_camera(device_id)
+
+    # If not found, try to find by device ID (backward compatibility)
     if not device:
-        raise HTTPException(status_code=404, detail="Device not connected")
+        device = ws_manager.get_device(device_id)
 
-    # Create request
+    if not device:
+        raise HTTPException(status_code=404, detail="Device or camera not found")
+
+    # Create request - use device_id as camera parameter
+    # (device_id might be a camera_id, which is what we want)
     request = WSRequest(
         id=str(uuid.uuid4()),
         type="LIST_VIDEOS",
@@ -128,12 +146,21 @@ async def list_videos(device_id: str):
 
 @router.get("/devices/{device_id}/videos/{filename}")
 async def stream_video(device_id: str, filename: str, request: Request):
-    """Stream video file with Range support."""
+    """Stream video file with Range support.
 
-    # Get device connection
-    device = ws_manager.get_device(device_id)
+    Note: device_id can be either a device ID or a camera ID.
+    The function will try to find the device by camera ID first.
+    """
+
+    # Try to find device by camera ID first
+    device = ws_manager.get_device_by_camera(device_id)
+
+    # If not found, try to find by device ID (backward compatibility)
     if not device:
-        raise HTTPException(status_code=404, detail="Device not connected")
+        device = ws_manager.get_device(device_id)
+
+    if not device:
+        raise HTTPException(status_code=404, detail="Device or camera not found")
 
     # Parse Range header
     range_header = request.headers.get("range")

@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 
 # Request Types
-RequestType = Literal["LIST_VIDEOS", "READ_FILE"]
-ResponseType = Literal["LIST_VIDEOS_RES", "READ_FILE_RES", "ERROR"]
+RequestType = Literal["LIST_VIDEOS", "READ_FILE", "REGISTER_CAMERAS"]
+ResponseType = Literal["LIST_VIDEOS_RES", "READ_FILE_RES", "REGISTER_CAMERAS_RES", "ERROR"]
 
 
 class WSRequest(BaseModel):
@@ -64,3 +64,23 @@ class ErrorResponse(BaseModel):
 
     error: str
     message: str
+
+
+class RegisterCamerasPayload(BaseModel):
+    """Payload for registering cameras with Proxy."""
+
+    cameras: list[str] = Field(..., description="List of camera identifiers")
+
+
+class CameraInfo(BaseModel):
+    """Camera information."""
+
+    device_id: str = Field(..., description="Device identifier")
+    camera_id: str = Field(..., description="Camera identifier")
+
+
+class ListCamerasResponse(BaseModel):
+    """Response payload for listing cameras."""
+
+    cameras: list[CameraInfo]
+    total: int

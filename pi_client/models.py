@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 # Request Types (from Proxy)
 RequestType = Literal["LIST_VIDEOS", "READ_FILE"]
-ResponseType = Literal["LIST_VIDEOS_RES", "READ_FILE_RES", "ERROR"]
+ResponseType = Literal["LIST_VIDEOS_RES", "READ_FILE_RES", "REGISTER_CAMERAS_RES", "ERROR"]
 
 
 class WSRequest(BaseModel):
@@ -40,6 +40,12 @@ class ReadFilePayload(BaseModel):
     filename: str = Field(..., description="Video filename")
     start: Optional[int] = Field(None, description="Start byte position")
     end: Optional[int] = Field(None, description="End byte position")
+
+
+class RegisterCamerasPayload(BaseModel):
+    """Payload for registering cameras with Proxy."""
+
+    cameras: list[str] = Field(..., description="List of camera identifiers")
 
 
 class VideoInfo(BaseModel):

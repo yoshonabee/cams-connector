@@ -1,10 +1,11 @@
 """WebSocket connection manager for Pi devices."""
 
 import asyncio
+import json
 import logging
 from typing import Optional
 from fastapi import WebSocket, WebSocketDisconnect
-from models import WSRequest, WSResponse
+from models import WSRequest, WSResponse, RegisterCamerasPayload, CameraInfo
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class DeviceConnection:
         self.websocket = websocket
         self.pending_requests: dict[str, PendingRequest] = {}
         self.receive_task: Optional[asyncio.Task] = None
+        self.cameras: list[str] = []
 
     async def send_request(self, request: WSRequest) -> WSResponse:
         """Send a request and wait for response."""
@@ -85,11 +87,25 @@ class DeviceConnection:
             # Clean up
             self.pending_requests.pop(request.id, None)
 
-    async def handle_message(self, message: str | bytes):
+    async def handle_message(self, message: str | bytes, ws_manager=None):
         """Handle incoming message from device."""
         if isinstance(message, str):
-            # JSON response
+            # Try to parse as JSON
             try:
+                data = json.loads(message)
+
+                # Check if it's a REGISTER_CAMERAS message
+                if data.get("type") == "REGISTER_CAMERAS":
+                    payload = RegisterCamerasPayload.model_validate(
+                        data.get("payload", {})
+                    )
+                    self.cameras = payload.cameras
+                    logger.info(
+                        f"Device {self.device_id} registered cameras: {self.cameras}"
+                    )
+                    return
+
+                # Otherwise, try to parse as WSResponse
                 response = WSResponse.model_validate_json(message)
                 logger.debug(
                     f"Received response {response.id} from device {self.device_id}"
@@ -105,7 +121,7 @@ class DeviceConnection:
                     )
 
             except Exception as e:
-                logger.error(f"Failed to parse JSON response: {e}")
+                logger.error(f"Failed to parse JSON message: {e}")
 
         else:
             # Binary data: first 36 bytes are request ID (UUID string)
@@ -161,6 +177,21 @@ class WSManager:
         """Get a device connection by ID."""
         return self.connections.get(device_id)
 
+    def get_all_cameras(self) -> list[CameraInfo]:
+        """Get all cameras from all connected devices."""
+        cameras: list[CameraInfo] = []
+        for device_id, device in self.connections.items():
+            for camera_id in device.cameras:
+                cameras.append(CameraInfo(device_id=device_id, camera_id=camera_id))
+        return cameras
+
+    def get_device_by_camera(self, camera_id: str) -> Optional[DeviceConnection]:
+        """Get device connection by camera ID."""
+        for device_id, device in self.connections.items():
+            if camera_id in device.cameras:
+                return device
+        return None
+
     async def _receive_loop(self, device: DeviceConnection):
         """Continuously receive messages from device."""
         try:
@@ -169,9 +200,9 @@ class WSManager:
                 message = await device.websocket.receive()
 
                 if "text" in message:
-                    await device.handle_message(message["text"])
+                    await device.handle_message(message["text"], ws_manager=self)
                 elif "bytes" in message:
-                    await device.handle_message(message["bytes"])
+                    await device.handle_message(message["bytes"], ws_manager=self)
 
         except WebSocketDisconnect:
             logger.info(f"Device {device.device_id} disconnected (WebSocket closed)")

@@ -1,31 +1,62 @@
-import { useState, useEffect } from 'react';
-import { listVideos } from './api';
-import type { VideoInfo } from './api';
-import VideoCard from './components/VideoCard';
-import VideoPlayer from './components/VideoPlayer';
-import './App.css';
+import { useState, useEffect } from "react";
+import { listVideos, listCameras } from "./api";
+import type { VideoInfo, CameraInfo } from "./api";
+import VideoCard from "./components/VideoCard";
+import VideoPlayer from "./components/VideoPlayer";
+import "./App.css";
 
 function App() {
-  const [deviceId, setDeviceId] = useState('cam1');
+  const [cameras, setCameras] = useState<CameraInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingCameras, setLoadingCameras] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
 
-  // Fetch videos when deviceId changes
+  // Load cameras on component mount
   useEffect(() => {
-    loadVideos();
-  }, [deviceId]);
+    loadCameras();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch videos when selectedCameraId changes
+  useEffect(() => {
+    if (selectedCameraId) {
+      loadVideos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCameraId]);
+
+  const loadCameras = async () => {
+    setLoadingCameras(true);
+    setError(null);
+
+    try {
+      const response = await listCameras();
+      setCameras(response.cameras);
+      // Set first camera as default if available
+      if (response.cameras.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(response.cameras[0].cameraId);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load cameras");
+    } finally {
+      setLoadingCameras(false);
+    }
+  };
 
   const loadVideos = async () => {
+    if (!selectedCameraId) return;
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await listVideos(deviceId);
+      const response = await listVideos(selectedCameraId);
       setVideos(response.videos);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load videos');
+      setError(err instanceof Error ? err.message : "Failed to load videos");
     } finally {
       setLoading(false);
     }
@@ -58,17 +89,32 @@ function App() {
             <label htmlFor="device-select">選擇監視器 / Camera:</label>
             <select
               id="device-select"
-              value={deviceId}
-              onChange={(e) => setDeviceId(e.target.value)}
+              value={selectedCameraId}
+              onChange={(e) => setSelectedCameraId(e.target.value)}
               className="device-select"
+              disabled={loadingCameras || cameras.length === 0}
             >
-              <option value="cam1">Camera 1</option>
-              <option value="cam2">Camera 2</option>
+              {cameras.length === 0 ? (
+                <option value="">載入中...</option>
+              ) : (
+                cameras.map((camera) => (
+                  <option
+                    key={`${camera.deviceId}-${camera.cameraId}`}
+                    value={camera.cameraId}
+                  >
+                    {camera.cameraId} ({camera.deviceId})
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
-          <button onClick={loadVideos} className="btn" disabled={loading}>
-            {loading ? <span className="spinner"></span> : '🔄'}
+          <button
+            onClick={loadVideos}
+            className="btn"
+            disabled={loading || !selectedCameraId}
+          >
+            {loading ? <span className="spinner"></span> : "🔄"}
             重新整理 / Refresh
           </button>
         </div>
@@ -103,7 +149,7 @@ function App() {
 
       {selectedVideo && (
         <VideoPlayer
-          deviceId={deviceId}
+          deviceId={selectedCameraId}
           filename={selectedVideo.filename}
           onClose={handleClosePlayer}
         />

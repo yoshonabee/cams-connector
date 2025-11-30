@@ -9,7 +9,13 @@ import websockets
 from websockets.client import WebSocketClientProtocol
 
 from config import settings
-from models import WSRequest, WSResponse, ListVideosPayload, ReadFilePayload
+from models import (
+    WSRequest,
+    WSResponse,
+    ListVideosPayload,
+    ReadFilePayload,
+    RegisterCamerasPayload,
+)
 from file_handler import FileHandler
 
 logger = logging.getLogger(__name__)
@@ -41,9 +47,24 @@ class PiClient:
 
             logger.info("Connected and authenticated successfully")
 
+            # Register cameras
+            await self.register_cameras()
+
         except Exception as e:
             logger.error(f"Failed to connect: {e}")
             raise
+
+    async def register_cameras(self):
+        """Register cameras with proxy server."""
+        try:
+            payload = RegisterCamerasPayload(cameras=settings.CAMERAS)
+            register_message = json.dumps(
+                {"type": "REGISTER_CAMERAS", "payload": payload.model_dump()}
+            )
+            await self.ws.send(register_message)
+            logger.info(f"Registered cameras: {settings.CAMERAS}")
+        except Exception as e:
+            logger.error(f"Failed to register cameras: {e}")
 
     async def disconnect(self):
         """Disconnect from proxy server."""
@@ -215,7 +236,9 @@ class PiClient:
             if self.running:
                 logger.info(f"Reconnecting in {settings.RECONNECT_DELAY} seconds...")
                 # Use sleep that can be interrupted by checking self.running
-                for _ in range(settings.RECONNECT_DELAY * 10):  # Check every 0.1 seconds
+                for _ in range(
+                    settings.RECONNECT_DELAY * 10
+                ):  # Check every 0.1 seconds
                     if not self.running:
                         break
                     await asyncio.sleep(0.1)
