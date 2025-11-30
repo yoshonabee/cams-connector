@@ -59,13 +59,13 @@ class FileHandler:
                 if file_path.is_file():
                     stat = file_path.stat()
 
-                    # Parse timestamp from filename (YYYYmmdd_HH:MM.mp4)
+                    # Parse timestamp from filename (YYYYmmdd_HHMM.mp4)
                     try:
                         filename = file_path.name
                         # Remove .mp4 extension
                         date_time_str = filename.replace(".mp4", "")
                         # Parse: YYYYmmdd_HH:MM
-                        timestamp = datetime.strptime(date_time_str, "%Y%m%d_%H:%M")
+                        timestamp = datetime.strptime(date_time_str, "%Y%m%d_%H%M")
                         timestamp_iso = timestamp.isoformat()
 
                         # Apply date filter
