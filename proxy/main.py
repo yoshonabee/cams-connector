@@ -14,7 +14,7 @@ from fastapi import (
     Query,
 )
 from typing import Optional
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 
 from config import settings
 from models import (
@@ -164,6 +164,7 @@ async def list_videos(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.head("/devices/{device_id}/videos/{filename}")
 @router.get("/devices/{device_id}/videos/{filename}")
 async def stream_video(device_id: str, filename: str, request: Request):
     """Stream video file with Range support.
@@ -186,6 +187,7 @@ async def stream_video(device_id: str, filename: str, request: Request):
     range_header = request.headers.get("range")
     start = None
     end = None
+    is_head_request = request.method == "HEAD"
 
     if range_header:
         # Parse "bytes=start-end"
@@ -197,6 +199,11 @@ async def stream_video(device_id: str, filename: str, request: Request):
                 end = int(parts[1]) if parts[1] else None
         except Exception as e:
             logger.warning(f"Failed to parse Range header: {e}")
+
+    # For HEAD requests, only request first byte to get file size
+    if is_head_request:
+        start = 0
+        end = 0
 
     # Create request
     ws_request = WSRequest(
@@ -220,14 +227,19 @@ async def stream_video(device_id: str, filename: str, request: Request):
         content_start = response.payload.get("start", 0)
         content_end = response.payload.get("end", file_size - 1)
 
-        # Combine chunks
-        data = b"".join(chunks)
-
         # Prepare headers
         headers = {
             "Accept-Ranges": "bytes",
             "Content-Type": "video/mp4",
         }
+
+        # For HEAD requests, return only headers
+        if is_head_request:
+            headers["Content-Length"] = str(file_size)
+            return Response(status_code=200, headers=headers)
+
+        # Combine chunks for GET requests
+        data = b"".join(chunks)
 
         # If range request, return 206 Partial Content
         if range_header:
