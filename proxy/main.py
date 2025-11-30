@@ -11,7 +11,9 @@ from fastapi import (
     HTTPException,
     Request,
     APIRouter,
+    Query,
 )
+from typing import Optional
 from fastapi.responses import StreamingResponse
 
 from config import settings
@@ -103,11 +105,24 @@ async def list_cameras():
 
 
 @router.get("/devices/{device_id}/videos")
-async def list_videos(device_id: str):
-    """List available videos for a device/camera.
+async def list_videos(
+    device_id: str,
+    date: Optional[str] = Query(None, description="Date filter in YYYYmmdd format"),
+    hour: Optional[int] = Query(None, description="Hour filter (0-23)", ge=0, le=23),
+    page: int = Query(1, description="Page number", ge=1),
+    page_size: int = Query(60, description="Page size", ge=1, le=1000),
+):
+    """List available videos for a device/camera with filtering and pagination.
 
     Note: device_id can be either a device ID or a camera ID.
     The function will try to find the device by camera ID first.
+
+    Args:
+        device_id: Device or camera identifier
+        date: Optional date filter in YYYYmmdd format
+        hour: Optional hour filter (0-23)
+        page: Page number (default: 1)
+        page_size: Number of items per page (default: 60)
     """
 
     # Try to find device by camera ID first
@@ -120,12 +135,17 @@ async def list_videos(device_id: str):
     if not device:
         raise HTTPException(status_code=404, detail="Device or camera not found")
 
-    # Create request - use device_id as camera parameter
-    # (device_id might be a camera_id, which is what we want)
+    # Create request with filtering and pagination parameters
     request = WSRequest(
         id=str(uuid.uuid4()),
         type="LIST_VIDEOS",
-        payload=ListVideosPayload(camera=device_id).model_dump(),
+        payload=ListVideosPayload(
+            camera=device_id,
+            date=date,
+            hour=hour,
+            page=page,
+            page_size=page_size,
+        ).model_dump(),
     )
 
     try:
@@ -136,7 +156,7 @@ async def list_videos(device_id: str):
             error = ErrorResponse.model_validate(response.payload)
             raise HTTPException(status_code=500, detail=error.message)
 
-        # Return video list
+        # Return video list with pagination info
         return response.payload
 
     except Exception as e:

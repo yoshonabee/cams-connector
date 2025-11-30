@@ -83,6 +83,36 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
+.date-input,
+.hour-select {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  min-width: 150px;
+}
+
+.date-input:hover,
+.hour-select:hover {
+  border-color: var(--color-primary);
+}
+
+.date-input:focus,
+.hour-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
 /* Messages */
 .error-message {
   background: rgba(239, 68, 68, 0.1);
@@ -114,7 +144,27 @@
 
 /* Videos grid */
 .videos-grid {
+  display: grid;
   animation: fadeIn 400ms ease;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-2xl);
+  padding: var(--space-lg);
+}
+
+.pagination-info {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.pagination .btn {
+  min-width: 100px;
 }
 
 /* Responsive */
@@ -133,7 +183,19 @@
     align-items: stretch;
   }
 
-  .device-select {
+  .device-select,
+  .date-input,
+  .hour-select {
     min-width: auto;
+    width: 100%;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .pagination .btn {
+    width: 100%;
   }
 }

@@ -14,6 +14,9 @@ export interface VideoInfo {
 export interface VideoListResponse {
   videos: VideoInfo[];
   total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }
 
 export interface CameraInfo {
@@ -38,10 +41,36 @@ export interface CameraListResponse {
 }
 
 /**
- * List all videos for a device/camera
+ * List all videos for a device/camera with filtering and pagination
  */
-export async function listVideos(deviceId: string): Promise<VideoListResponse> {
-  const response = await fetch(`${API_BASE}/devices/${deviceId}/videos`);
+export async function listVideos(
+  deviceId: string,
+  options?: {
+    date?: string; // YYYYmmdd format
+    hour?: number; // 0-23
+    page?: number;
+    page_size?: number;
+  }
+): Promise<VideoListResponse> {
+  const params = new URLSearchParams();
+  
+  if (options?.date) {
+    params.append('date', options.date);
+  }
+  if (options?.hour !== undefined) {
+    params.append('hour', options.hour.toString());
+  }
+  if (options?.page !== undefined) {
+    params.append('page', options.page.toString());
+  }
+  if (options?.page_size !== undefined) {
+    params.append('page_size', options.page_size.toString());
+  }
+
+  const queryString = params.toString();
+  const url = `${API_BASE}/devices/${deviceId}/videos${queryString ? `?${queryString}` : ''}`;
+  
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error(`Failed to list videos: ${response.statusText}`);

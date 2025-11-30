@@ -13,6 +13,13 @@ function App() {
   const [loadingCameras, setLoadingCameras] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
+  
+  // Pagination and filtering state
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalVideos, setTotalVideos] = useState<number>(0);
 
   // Load cameras on component mount
   useEffect(() => {
@@ -20,13 +27,13 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch videos when selectedCameraId changes
+  // Fetch videos when selectedCameraId, date, hour, or page changes
   useEffect(() => {
     if (selectedCameraId) {
       loadVideos();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCameraId]);
+  }, [selectedCameraId, selectedDate, selectedHour, currentPage]);
 
   const loadCameras = async () => {
     setLoadingCameras(true);
@@ -53,13 +60,41 @@ function App() {
     setError(null);
 
     try {
-      const response = await listVideos(selectedCameraId);
+      // Convert date from YYYY-MM-DD to YYYYmmdd format
+      const dateParam = selectedDate
+        ? selectedDate.replace(/-/g, "")
+        : undefined;
+
+      const response = await listVideos(selectedCameraId, {
+        date: dateParam,
+        hour: selectedHour ?? undefined,
+        page: currentPage,
+        page_size: 60,
+      });
+      
       setVideos(response.videos);
+      setTotalVideos(response.total);
+      setTotalPages(response.total_pages);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load videos");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  const handleHourChange = (hour: number | null) => {
+    setSelectedHour(hour);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleVideoClick = (video: VideoInfo) => {
@@ -109,6 +144,39 @@ function App() {
             </select>
           </div>
 
+          <div className="control-group">
+            <label htmlFor="date-select">日期 / Date:</label>
+            <input
+              id="date-select"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="date-input"
+              max={new Date().toISOString().split("T")[0]}
+            />
+          </div>
+
+          <div className="control-group">
+            <label htmlFor="hour-select">小時 / Hour:</label>
+            <select
+              id="hour-select"
+              value={selectedHour ?? ""}
+              onChange={(e) =>
+                handleHourChange(
+                  e.target.value === "" ? null : parseInt(e.target.value, 10)
+                )
+              }
+              className="hour-select"
+            >
+              <option value="">全部 / All</option>
+              {Array.from({ length: 24 }, (_, i) => (
+                <option key={i} value={i}>
+                  {i.toString().padStart(2, "0")}:00
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={loadVideos}
             className="btn"
@@ -135,15 +203,39 @@ function App() {
             <p className="text-muted">📂 沒有找到影片 / No videos found</p>
           </div>
         ) : (
-          <div className="videos-grid grid-3">
-            {videos.map((video) => (
-              <VideoCard
-                key={video.filename}
-                video={video}
-                onClick={() => handleVideoClick(video)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="videos-grid grid-3">
+              {videos.map((video) => (
+                <VideoCard
+                  key={video.filename}
+                  video={video}
+                  onClick={() => handleVideoClick(video)}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || loading}
+                >
+                  ← 上一頁
+                </button>
+                <span className="pagination-info">
+                  第 {currentPage} / {totalPages} 頁（共 {totalVideos} 個影片）
+                </span>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || loading}
+                >
+                  下一頁 →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
 

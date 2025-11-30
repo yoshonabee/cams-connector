@@ -31,6 +31,10 @@ class ListVideosPayload(BaseModel):
     """Payload for LIST_VIDEOS request."""
 
     camera: str = Field(..., description="Camera identifier")
+    date: Optional[str] = Field(None, description="Date filter in YYYYmmdd format")
+    hour: Optional[int] = Field(None, description="Hour filter (0-23)")
+    page: Optional[int] = Field(1, description="Page number (default: 1)")
+    page_size: Optional[int] = Field(60, description="Page size (default: 60)")
 
 
 class ReadFilePayload(BaseModel):

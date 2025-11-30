@@ -85,15 +85,28 @@ class PiClient:
         try:
             payload = ListVideosPayload.model_validate(request.payload)
 
-            # List videos
-            videos = self.file_handler.list_videos(payload.camera)
+            # List videos with filtering and pagination
+            videos, total_count = self.file_handler.list_videos(
+                camera=payload.camera,
+                date=payload.date,
+                hour=payload.hour,
+                page=payload.page or 1,
+                page_size=payload.page_size or 60,
+            )
+
+            # Calculate total pages
+            page_size = payload.page_size or 60
+            total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 0
 
             return WSResponse(
                 id=request.id,
                 type="LIST_VIDEOS_RES",
                 payload={
                     "videos": [v.model_dump() for v in videos],
-                    "total": len(videos),
+                    "total": total_count,
+                    "page": payload.page or 1,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
                 },
             )
 

@@ -22,16 +22,27 @@ class FileHandler:
         """
         self.recordings_dir = recordings_dir or settings.RECORDINGS_DIR
 
-    def list_videos(self, camera: str) -> list[VideoInfo]:
-        """List all video files for a camera.
+    def list_videos(
+        self,
+        camera: str,
+        date: Optional[str] = None,
+        hour: Optional[int] = None,
+        page: int = 1,
+        page_size: int = 60,
+    ) -> tuple[list[VideoInfo], int]:
+        """List video files for a camera with filtering and pagination.
 
         Directory structure: ~/recordings/<camera_name>/merged/YYYYmmdd_HH:MM.mp4
 
         Args:
             camera: Camera identifier
+            date: Optional date filter in YYYYmmdd format
+            hour: Optional hour filter (0-23)
+            page: Page number (1-indexed)
+            page_size: Number of items per page
 
         Returns:
-            List of VideoInfo objects
+            Tuple of (filtered and paginated videos list, total count)
         """
         videos: list[VideoInfo] = []
 
@@ -40,7 +51,7 @@ class FileHandler:
 
         if not camera_dir.exists():
             logger.warning(f"Camera directory does not exist: {camera_dir}")
-            return videos
+            return [], 0
 
         # Scan for .mp4 files
         try:
@@ -56,14 +67,29 @@ class FileHandler:
                         # Parse: YYYYmmdd_HH:MM
                         timestamp = datetime.strptime(date_time_str, "%Y%m%d_%H:%M")
                         timestamp_iso = timestamp.isoformat()
+
+                        # Apply date filter
+                        if date:
+                            file_date_str = timestamp.strftime("%Y%m%d")
+                            if file_date_str != date:
+                                continue
+
+                        # Apply hour filter
+                        if hour is not None:
+                            if timestamp.hour != hour:
+                                continue
+
                     except Exception as e:
                         logger.warning(
                             f"Failed to parse timestamp from {filename}: {e}"
                         )
                         # Use file modification time as fallback
-                        timestamp_iso = datetime.fromtimestamp(
-                            stat.st_mtime
-                        ).isoformat()
+                        timestamp = datetime.fromtimestamp(stat.st_mtime)
+                        timestamp_iso = timestamp.isoformat()
+
+                        # If date/hour filter is specified but parsing failed, skip
+                        if date or hour is not None:
+                            continue
 
                     videos.append(
                         VideoInfo(
@@ -82,7 +108,18 @@ class FileHandler:
         # Sort by timestamp (newest first)
         videos.sort(key=lambda v: v.timestamp, reverse=True)
 
-        return videos
+        # Calculate pagination
+        total_count = len(videos)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_videos = videos[start_idx:end_idx]
+
+        logger.info(
+            f"Returning page {page} ({len(paginated_videos)} videos) "
+            f"out of {total_count} total"
+        )
+
+        return paginated_videos, total_count
 
     def read_file_chunk(
         self,
