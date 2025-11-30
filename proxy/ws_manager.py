@@ -76,15 +76,45 @@ class DeviceConnection:
             await self.websocket.send_text(request.model_dump_json())
             logger.debug(f"Sent request {request.id} to device {self.device_id}")
 
-            # Wait for response with timeout
+            # Wait for JSON response with timeout
             response = await asyncio.wait_for(pending.future, timeout=60.0)
+            
+            # Get expected data length from response
+            expected_length = response.payload.get("length", 0)
+            
+            # Wait for all binary data to be received
+            if expected_length > 0:
+                total_received = sum(len(chunk) for chunk in pending.data_chunks)
+                max_wait_time = 60.0  # Maximum time to wait for all data
+                wait_start = asyncio.get_event_loop().time()
+                
+                while total_received < expected_length:
+                    # Check timeout
+                    elapsed = asyncio.get_event_loop().time() - wait_start
+                    if elapsed > max_wait_time:
+                        logger.warning(
+                            f"Timeout waiting for binary data for request {request.id}: "
+                            f"received {total_received}/{expected_length} bytes"
+                        )
+                        break
+                    
+                    # Wait a bit for more data to arrive
+                    await asyncio.sleep(0.01)  # 10ms
+                    total_received = sum(len(chunk) for chunk in pending.data_chunks)
+                
+                logger.debug(
+                    f"Received {total_received}/{expected_length} bytes for request {request.id}"
+                )
+            
             return response, pending.data_chunks
 
         except asyncio.TimeoutError:
             logger.error(f"Request {request.id} timed out")
             raise
         finally:
-            # Clean up
+            # Clean up - but wait a bit to ensure all data is received
+            # Give a small grace period for any late-arriving chunks
+            await asyncio.sleep(0.1)
             self.pending_requests.pop(request.id, None)
 
     async def handle_message(self, message: str | bytes, ws_manager=None):
