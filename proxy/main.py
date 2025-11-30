@@ -10,8 +10,8 @@ from fastapi import (
     WebSocketDisconnect,
     HTTPException,
     Request,
+    APIRouter,
 )
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from config import settings
@@ -43,12 +43,13 @@ app = FastAPI(
     description="Proxy server for Raspberry Pi video streaming",
     version="1.0.0",
     lifespan=lifespan,
-    prefix="/api",
 )
+
+router = APIRouter(prefix="/api")
 
 
 # WebSocket endpoint for Pi devices
-@app.websocket("/ws/device/{device_id}")
+@router.websocket("/ws/device/{device_id}")
 async def device_websocket(websocket: WebSocket, device_id: str):
     """WebSocket endpoint for Pi device connection."""
 
@@ -93,7 +94,7 @@ async def device_websocket(websocket: WebSocket, device_id: str):
 
 
 # HTTP API for clients
-@app.get("/api/devices/{device_id}/videos")
+@router.get("/devices/{device_id}/videos")
 async def list_videos(device_id: str):
     """List available videos for a device/camera."""
 
@@ -125,7 +126,7 @@ async def list_videos(device_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/devices/{device_id}/videos/{filename}")
+@router.get("/devices/{device_id}/videos/{filename}")
 async def stream_video(device_id: str, filename: str, request: Request):
     """Stream video file with Range support."""
 
@@ -214,6 +215,9 @@ async def stream_video(device_id: str, filename: str, request: Request):
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "connected_devices": len(ws_manager.connections)}
+
+
+app.include_router(router)
 
 
 if __name__ == "__main__":
