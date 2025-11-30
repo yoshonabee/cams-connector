@@ -200,8 +200,9 @@ async def stream_video(device_id: str, filename: str, request: Request):
         except Exception as e:
             logger.warning(f"Failed to parse Range header: {e}")
 
-    # For HEAD requests, only request first byte to get file size
-    if is_head_request:
+    # For HEAD requests without range, request first byte to get file size
+    # For HEAD requests with range, use the range as specified
+    if is_head_request and not range_header:
         start = 0
         end = 0
 

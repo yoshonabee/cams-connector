@@ -154,7 +154,13 @@ class FileHandler:
 
         # Determine actual range
         actual_start = start if start is not None else 0
-        actual_end = end if end is not None else file_size - 1
+        # If end is explicitly 0, it means read only the first byte (for HEAD requests)
+        # Otherwise, if end is None, read to end of file
+        if end == 0 and start == 0:
+            # Special case: HEAD request - only read first byte
+            actual_end = 0
+        else:
+            actual_end = end if end is not None else file_size - 1
 
         # Validate range
         if actual_start < 0 or actual_end >= file_size or actual_start > actual_end:
