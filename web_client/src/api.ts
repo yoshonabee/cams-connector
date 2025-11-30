@@ -21,6 +21,17 @@ export interface CameraInfo {
   cameraId: string;
 }
 
+// Backend response format (snake_case)
+interface CameraInfoResponse {
+  device_id: string;
+  camera_id: string;
+}
+
+interface CameraListResponseRaw {
+  cameras: CameraInfoResponse[];
+  total: number;
+}
+
 export interface CameraListResponse {
   cameras: CameraInfo[];
   total: number;
@@ -49,7 +60,16 @@ export async function listCameras(): Promise<CameraListResponse> {
     throw new Error(`Failed to list cameras: ${response.statusText}`);
   }
 
-  return response.json();
+  const data: CameraListResponseRaw = await response.json();
+
+  // Convert snake_case to camelCase
+  return {
+    cameras: data.cameras.map((camera) => ({
+      deviceId: camera.device_id,
+      cameraId: camera.camera_id,
+    })),
+    total: data.total,
+  };
 }
 
 /**
