@@ -35,16 +35,3 @@ export async function listVideos(deviceId: string): Promise<VideoListResponse> {
 export function getVideoUrl(deviceId: string, filename: string): string {
   return `${API_BASE}/devices/${deviceId}/videos/${encodeURIComponent(filename)}`;
 }
-
-/**
- * Check proxy server health
- */
-export async function checkHealth(): Promise<{ status: string; connected_devices: number }> {
-  const response = await fetch(`${API_BASE}/health`);
-  
-  if (!response.ok) {
-    throw new Error('Health check failed');
-  }
-  
-  return response.json();
-}

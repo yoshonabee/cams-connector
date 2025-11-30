@@ -28,16 +28,6 @@
   background-clip: text;
 }
 
-.health-status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-bg-card);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-}
-
 .status-indicator {
   font-size: 0.75rem;
 }

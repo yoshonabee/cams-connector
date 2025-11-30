@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listVideos, checkHealth } from './api';
+import { listVideos } from './api';
 import type { VideoInfo } from './api';
 import VideoCard from './components/VideoCard';
 import VideoPlayer from './components/VideoPlayer';
@@ -11,14 +11,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoInfo | null>(null);
-  const [healthStatus, setHealthStatus] = useState<{ status: string; connected_devices: number } | null>(null);
-
-  // Fetch health status on mount
-  useEffect(() => {
-    checkHealth()
-      .then(setHealthStatus)
-      .catch(() => setHealthStatus(null));
-  }, []);
 
   // Fetch videos when deviceId changes
   useEffect(() => {
@@ -56,17 +48,6 @@ function App() {
               <h1>📹 監視器影片瀏覽系統</h1>
               <p className="text-secondary">Camera Video Browsing System</p>
             </div>
-
-            {healthStatus && (
-              <div className="health-status">
-                <span className={`status-indicator ${healthStatus.status === 'ok' ? 'status-ok' : 'status-error'}`}>
-                  {healthStatus.status === 'ok' ? '🟢' : '🔴'}
-                </span>
-                <span className="text-secondary">
-                  {healthStatus.connected_devices} device(s) connected
-                </span>
-              </div>
-            )}
           </div>
         </div>
       </header>
