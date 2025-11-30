@@ -185,8 +185,8 @@ async def stream_video(device_id: str, filename: str, request: Request):
 
     # Parse Range header
     range_header = request.headers.get("range")
-    start = None
-    end = None
+    requested_start = None
+    requested_end = None
     is_head_request = request.method == "HEAD"
 
     if range_header:
@@ -195,10 +195,17 @@ async def stream_video(device_id: str, filename: str, request: Request):
             range_str = range_header.replace("bytes=", "")
             if "-" in range_str:
                 parts = range_str.split("-")
-                start = int(parts[0]) if parts[0] else None
-                end = int(parts[1]) if parts[1] else None
+                requested_start = int(parts[0]) if parts[0] else None
+                requested_end = int(parts[1]) if parts[1] else None
+                logger.debug(
+                    f"Range request for {filename}: {requested_start}-{requested_end}"
+                )
         except Exception as e:
             logger.warning(f"Failed to parse Range header: {e}")
+
+    # Use requested range for the request to pi_client
+    start = requested_start
+    end = requested_end
 
     # For HEAD requests without range, request first byte to get file size
     # For HEAD requests with range, use the range as specified
@@ -246,28 +253,60 @@ async def stream_video(device_id: str, filename: str, request: Request):
 
         # If range request, return 206 Partial Content
         if range_header:
-            # Ensure content_end doesn't exceed file_size - 1
-            if content_end >= file_size:
-                content_end = file_size - 1
             # Ensure content_start is valid
             if content_start < 0:
                 content_start = 0
+
+            # Verify that the returned range is valid
+            # If requested start is beyond file size, return 416 Range Not Satisfiable
+            if requested_start is not None and requested_start >= file_size:
+                logger.warning(
+                    f"Range start {requested_start} beyond file size {file_size} for {filename}"
+                )
+                raise HTTPException(
+                    status_code=416,
+                    detail=f"Range Not Satisfiable: start {requested_start} >= file size {file_size}",
+                    headers={"Content-Range": f"bytes */{file_size}"},
+                )
+
+            # Ensure content_end doesn't exceed file_size - 1
+            # Use the actual end returned from pi_client, but clamp to file size
+            if content_end >= file_size:
+                content_end = file_size - 1
+                # If we got more data than the file size, truncate it
+                expected_length = content_end - content_start + 1
+                if actual_data_length > expected_length:
+                    data = data[:expected_length]
+                    actual_data_length = len(data)
+
             # Use actual returned range from pi_client
             # Content-Range format: bytes start-end/total
+            # The range should match what we're actually returning
             headers["Content-Range"] = (
                 f"bytes {content_start}-{content_end}/{file_size}"
             )
-            # Content-Length should match the actual data size returned
-            # Expected length should be (content_end - content_start + 1)
+            # Content-Length should match the actual data size we're returning
+            # This should be (content_end - content_start + 1)
             expected_length = content_end - content_start + 1
             headers["Content-Length"] = str(actual_data_length)
+
             # Verify the length matches (log warning if mismatch)
             if actual_data_length != expected_length:
                 logger.warning(
                     f"Range response length mismatch for {filename}: "
                     f"expected {expected_length} bytes (range {content_start}-{content_end}), "
-                    f"got {actual_data_length} bytes"
+                    f"got {actual_data_length} bytes. Adjusting Content-Length."
                 )
+                # Use actual data length to avoid ERR_REQUEST_RANGE_NOT_SATISFIABLE
+                headers["Content-Length"] = str(actual_data_length)
+                # Update Content-Range to match actual data
+                actual_end = content_start + actual_data_length - 1
+                if actual_end < content_end:
+                    content_end = actual_end
+                    headers["Content-Range"] = (
+                        f"bytes {content_start}-{content_end}/{file_size}"
+                    )
+
             status_code = 206
         else:
             # Full file request
