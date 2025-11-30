@@ -43,7 +43,7 @@ export async function listVideos(deviceId: string): Promise<VideoListResponse> {
  * List all available cameras from all connected devices
  */
 export async function listCameras(): Promise<CameraListResponse> {
-  const response = await fetch(`${API_BASE}/api/cameras`);
+  const response = await fetch(`${API_BASE}/cameras`);
 
   if (!response.ok) {
     throw new Error(`Failed to list cameras: ${response.statusText}`);
