@@ -209,6 +209,9 @@ async def stream_video(device_id: str, filename: str, request: Request):
 
     # For HEAD requests without range, request first byte to get file size
     # For HEAD requests with range, use the range as specified
+    # Note: We'll use send_request instead of send_request_with_binary for HEAD
+    # to avoid waiting for binary data we don't need, but pi_client will still send it
+    # which is fine - it will be ignored after the request completes
     if is_head_request and not range_header:
         start = 0
         end = 0
@@ -223,7 +226,24 @@ async def stream_video(device_id: str, filename: str, request: Request):
     )
 
     try:
-        # Send request and get response with binary data
+        # For HEAD requests, we need file size but don't need the actual data
+        # Use send_request_with_binary but return immediately after getting the response
+        # The binary data will be received in the background and can be ignored
+        if is_head_request:
+            response, _ = await device.send_request_with_binary(ws_request)
+            if response.type == "ERROR":
+                error = ErrorResponse.model_validate(response.payload)
+                raise HTTPException(status_code=500, detail=error.message)
+
+            file_size = response.payload.get("size", 0)
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Type": "video/mp4",
+                "Content-Length": str(file_size),
+            }
+            return Response(status_code=200, headers=headers)
+
+        # For GET requests, get response with binary data
         response, chunks = await device.send_request_with_binary(ws_request)
 
         if response.type == "ERROR":
@@ -242,14 +262,17 @@ async def stream_video(device_id: str, filename: str, request: Request):
             "Content-Type": "video/mp4",
         }
 
-        # For HEAD requests, return only headers
-        if is_head_request:
-            headers["Content-Length"] = str(file_size)
-            return Response(status_code=200, headers=headers)
-
         # Combine chunks for GET requests
         data = b"".join(chunks)
         actual_data_length = len(data)
+
+        # Log if we got no data
+        if actual_data_length == 0 and not is_head_request:
+            logger.warning(
+                f"Received 0 bytes for {filename}, expected {content_length} bytes. "
+                f"Chunks received: {len(chunks)}, content_start: {content_start}, "
+                f"content_end: {content_end}, file_size: {file_size}"
+            )
 
         # If range request, return 206 Partial Content
         if range_header:
