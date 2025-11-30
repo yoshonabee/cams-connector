@@ -161,9 +161,12 @@ class FileHandler:
             actual_end = 0
         else:
             actual_end = end if end is not None else file_size - 1
+            # Clamp end to file size to prevent out-of-range errors
+            if actual_end >= file_size:
+                actual_end = file_size - 1
 
         # Validate range
-        if actual_start < 0 or actual_end >= file_size or actual_start > actual_end:
+        if actual_start < 0 or actual_start > actual_end:
             raise ValueError(
                 f"Invalid range: {actual_start}-{actual_end} (file size: {file_size})"
             )
